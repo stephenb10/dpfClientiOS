@@ -64,8 +64,6 @@ class Model: ObservableObject, serverDelegate {
         serv.receiveAllImages()
     }
     
-    
-    
 }
 
 struct ContentView: View {
@@ -75,6 +73,7 @@ struct ContentView: View {
     @State var uiimage: UIImage? = nil
     @State var showImageFullView = false
     @State var selectedImage = UIImage()
+    
     
     
     let columns = [

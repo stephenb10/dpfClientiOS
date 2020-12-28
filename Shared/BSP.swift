@@ -34,6 +34,8 @@ class Server : NSObject {
     var inputStream: InputStream!
     var outputStream : OutputStream!
     var imageCache = ImageCache.getImageCache()
+    var address = "192.168.1.14"
+    var port = 6969
     
     enum requestType:String {
         case transfer = "Transfer-Image"
@@ -44,7 +46,7 @@ class Server : NSObject {
         var readStream : Unmanaged<CFReadStream>?
         var writeStream : Unmanaged<CFWriteStream>?
         
-        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, "192.168.1.14" as CFString, 6969, &readStream, &writeStream)
+        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, address as CFString, UInt32(port), &readStream, &writeStream)
         
         inputStream = readStream!.takeRetainedValue()
         outputStream = writeStream?.takeRetainedValue()
@@ -94,17 +96,16 @@ class Server : NSObject {
             
             // Convert image to JPEG data and encode in base64
             let imageData = image.jpegData(compressionQuality: 1.0)
-            //let imageData = image.pngData()
+            
             let strBase64 = imageData!.base64EncodedString(options: .lineLength64Characters)
-            print(strBase64.count)
             let content = strBase64.data(using: .utf8)!
             
             // Generate BSP headers to transfer image to server
             let headers = self.generateHeaders(type: .transfer, contentLength: content.count)
             
-            // First 2 bytes of message specify the size of the headers
+            // First 3 bytes of message specify the size of the headers
             // Encode data to be sent with utf8
-            let data = String(headers.count).data(using: .utf8)!
+            let data = String(String(format: "%03d", headers.count)).data(using: .utf8)!
             
             // Send the header size to the server
             data.withUnsafeBytes {
@@ -129,7 +130,8 @@ class Server : NSObject {
             
             print("Image sent to server")
             
-            
+            //TO DO
+            // Change readmessage to return json headers then add that id to the list of all image ID's
             self.readMessage { (imageID) in
                 // cache the imageID here
                 print(imageID)
@@ -139,64 +141,10 @@ class Server : NSObject {
                     
                 }
                 print("!!!~~~~~~~~ Cached image~~!!!!!")
-                    
-            }
-        }
-        
-        
-    }
-    
-    func receiveImage() {
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
-        
-        var numberOfBytesRead = 0
-        
-        numberOfBytesRead = self.inputStream.read(buffer, maxLength: 3)
-        guard let headerSize = self.processedMessageString(buffer: buffer, length: numberOfBytesRead) else {
-            self.readingMessage = false
-            return
-        }
-        print("header size", headerSize)
-        
-        let size = Int(headerSize) ?? 0
-        let headerBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-        numberOfBytesRead = self.inputStream.read(headerBuffer, maxLength: size)
-        print("read header of bytes", numberOfBytesRead)
-        
-        guard let jsonHeaders = self.processedMessageString(buffer: headerBuffer, length: numberOfBytesRead) else {
-            self.readingMessage = false
-            print("error processing json header")
-            return
-        }
-        
-        print("headers", jsonHeaders)
-        
-        do {
-            let decoded = try JSONSerialization.jsonObject(with: jsonHeaders.data(using: .utf8)!, options: [])
-            // Work with headers here
-            if let headers = decoded as? [String:String] {
                 
-                if let imageID = headers["ImageID"] {
-                    
-                    if let contentLength = headers["Content-Length"] {
-                        let imageData = self.readall(contentLength: Int(contentLength)!)
-                        
-                        if let decodedData = Data(base64Encoded: imageData, options: .ignoreUnknownCharacters) {
-                            let image = UIImage(data: decodedData)
-                            DispatchQueue.main.async {
-                                self.delegate?.receivedImage(image: image!)
-                                self.imageCache.set(forKey: imageID, image: image!)
-                                
-                            }
-                            
-                        }
-                    }
-                    
-                }
             }
-        } catch {
-            
         }
+        
         
     }
     
@@ -207,9 +155,9 @@ class Server : NSObject {
             // Generate BSP headers to transfer image to server
             let headers = self.generateHeaders(type: .request)
             
-            // First 2 by   tes of message specify the size of the headers
+            // First 3 bytes of message specify the size of the headers
             // Encode data to be sent with utf8
-            let data = String(headers.count).data(using: .utf8)!
+            let data = String(String(format: "%03d", headers.count)).data(using: .utf8)!
             
             // Send the header size to the server
             data.withUnsafeBytes {
@@ -229,84 +177,48 @@ class Server : NSObject {
                 self.outputStream.write(pointer, maxLength: headers.count)
             }
             
-            repeat {
-                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
-                
-                var numberOfBytesRead = 0
-                
-                numberOfBytesRead = self.inputStream.read(buffer, maxLength: 3)
-                guard let headerSize = self.processedMessageString(buffer: buffer, length: numberOfBytesRead) else {
-                    self.readingMessage = false
-                    break
-                }
-                print("header size", headerSize)
-                
-                let size = Int(headerSize) ?? 0
-                let headerBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-                numberOfBytesRead = self.inputStream.read(headerBuffer, maxLength: size)
-                print("read header of bytes", numberOfBytesRead)
-                
-                guard let jsonHeaders = self.processedMessageString(buffer: headerBuffer, length: numberOfBytesRead) else {
-                    self.readingMessage = false
-                    print("error processing json header")
-                    break
-                }
-                
-                print("headers", jsonHeaders)
-                
-                do {
-                    let decoded = try JSONSerialization.jsonObject(with: jsonHeaders.data(using: .utf8)!, options: [])
-                    // Work with headers here
-                    if let headers = decoded as? [String:String] {
-                        
-                        if let imageID = headers["ImageID"] {
-                            print(imageID)
-                            
-                            let image = self.imageCache.get(forKey: imageID)
-                            
-                            let response = (image == nil ? "1" : "0")
-                            
-                            let data = response.data(using: .utf8)!
-                            
-                            // Send the resonse to server to receive the image
-                            data.withUnsafeBytes {
-                                guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                                    print("Error")
-                                    return
-                                }
-                                self.outputStream.write(pointer, maxLength: data.count)
-                            }
-                            
-                            if image == nil {
-                                print("Image not cached, download from server")
-                                self.receiveImage()
-                            }
-                            else {
-                                print("Image cached")
-                                DispatchQueue.main.async {
-                                    self.delegate?.receivedImage(image: image!)
-                                    
-                                }
-                            }
-                            
-                            
-                        }
-                        else if let contentLength = headers["Content-Length"] {
-                            
-                            if Int(contentLength) == 0 {
-                                DispatchQueue.main.async {self.delegate?.finishedReceivingImages()}
-                                break
-                            }
-                        }
-                        
+            // Receive dictionary with all the image ID's
+            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
+            
+            var numberOfBytesRead = 0
+            
+            numberOfBytesRead = self.inputStream.read(buffer, maxLength: 3)
+            guard let headerSize = self.processedMessageString(buffer: buffer, length: numberOfBytesRead) else {
+                self.readingMessage = false
+                return
+            }
+            
+            print("header size", headerSize)
+            
+            let size = Int(headerSize) ?? 0
+            let headerBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
+            numberOfBytesRead = self.inputStream.read(headerBuffer, maxLength: size)
+            print("read header of bytes", numberOfBytesRead)
+            
+            
+            // JSON Dictionary of all image ID's in format of [String:String] [index:imageID]
+            let jsonHeaders = self.readall(contentLength: size)
+            
+            print("headers", jsonHeaders)
+            
+            do {
+                let decoded = try JSONSerialization.jsonObject(with: jsonHeaders.data(using: .utf8)!, options: [])
+                // Work with headers here
+                if let headers = decoded as? [String:String] {
+                    // Dictionary format int : string
+                    // list of all imageID's
+                   
+                    for (index, imageID) in headers {
+                        // add ID to a list of all image ID's
                     }
                     
-                } catch {
+                    /// NOTIFY DELEGATE RECEIVED ALL IMAGE ID's
                     
                 }
                 
-            } while true
-            
+            } catch {
+                
+            }
             
         }
     }
@@ -451,6 +363,9 @@ extension Server: StreamDelegate {
         }
         return string
     }
+    
+    // TO DO
+    // Change this to read Headers and return a json dictionary
     
     private func readMessage(stream: InputStream? = nil, receivedImageID: (_ imageID: String) -> () = {_ in }) {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
