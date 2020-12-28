@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		09060B402576393E00417065 /* BSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09060B3F2576393D00417065 /* BSP.swift */; };
+		09060B412576393E00417065 /* BSP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09060B3F2576393D00417065 /* BSP.swift */; };
 		09259643256F219900C1C37C /* Tests_iOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09259642256F219900C1C37C /* Tests_iOS.swift */; };
 		0925964E256F219900C1C37C /* Tests_macOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0925964D256F219900C1C37C /* Tests_macOS.swift */; };
 		09259650256F219900C1C37C /* DigiFrameApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09259627256F219500C1C37C /* DigiFrameApp.swift */; };
@@ -35,6 +37,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		09060B3F2576393D00417065 /* BSP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSP.swift; sourceTree = "<group>"; };
 		09259627256F219500C1C37C /* DigiFrameApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigiFrameApp.swift; sourceTree = "<group>"; };
 		09259628256F219500C1C37C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		09259629256F219900C1C37C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -101,6 +104,7 @@
 				09259627256F219500C1C37C /* DigiFrameApp.swift */,
 				09259628256F219500C1C37C /* ContentView.swift */,
 				09259629256F219900C1C37C /* Assets.xcassets */,
+				09060B3F2576393D00417065 /* BSP.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -309,6 +313,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				09259652256F219900C1C37C /* ContentView.swift in Sources */,
+				09060B402576393E00417065 /* BSP.swift in Sources */,
 				09259650256F219900C1C37C /* DigiFrameApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -318,6 +323,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				09259653256F219900C1C37C /* ContentView.swift in Sources */,
+				09060B412576393E00417065 /* BSP.swift in Sources */,
 				09259651256F219900C1C37C /* DigiFrameApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
