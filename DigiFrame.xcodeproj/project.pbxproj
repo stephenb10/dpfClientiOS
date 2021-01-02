@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 50;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -17,6 +17,10 @@
 		09259653256F219900C1C37C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09259628256F219500C1C37C /* ContentView.swift */; };
 		09259654256F219900C1C37C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09259629256F219900C1C37C /* Assets.xcassets */; };
 		09259655256F219900C1C37C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09259629256F219900C1C37C /* Assets.xcassets */; };
+		09D07CCE259C1AB500FC11EB /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */; };
+		09EBF3A9259F252100EBD95F /* SSDP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09EBF3A8259F252100EBD95F /* SSDP.swift */; };
+		09EBF3AA259F252100EBD95F /* SSDP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09EBF3A8259F252100EBD95F /* SSDP.swift */; };
+		09EBF3B525A0839600EBD95F /* Socket in Frameworks */ = {isa = PBXBuildFile; productRef = 09EBF3B425A0839600EBD95F /* Socket */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +56,7 @@
 		09259649256F219900C1C37C /* Tests macOS.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tests macOS.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0925964D256F219900C1C37C /* Tests_macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests_macOS.swift; sourceTree = "<group>"; };
 		0925964F256F219900C1C37C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		09EBF3A8259F252100EBD95F /* SSDP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSDP.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +64,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				09EBF3B525A0839600EBD95F /* Socket in Frameworks */,
+				09D07CCE259C1AB500FC11EB /* SDWebImageSwiftUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,6 +112,7 @@
 				09259628256F219500C1C37C /* ContentView.swift */,
 				09259629256F219900C1C37C /* Assets.xcassets */,
 				09060B3F2576393D00417065 /* BSP.swift */,
+				09EBF3A8259F252100EBD95F /* SSDP.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -171,6 +179,10 @@
 			dependencies = (
 			);
 			name = "DigiFrame (iOS)";
+			packageProductDependencies = (
+				09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */,
+				09EBF3B425A0839600EBD95F /* Socket */,
+			);
 			productName = "DigiFrame (iOS)";
 			productReference = 0925962E256F219900C1C37C /* DigiFrame.app */;
 			productType = "com.apple.product-type.application";
@@ -262,6 +274,10 @@
 				Base,
 			);
 			mainGroup = 09259621256F219500C1C37C;
+			packageReferences = (
+				09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
+				09EBF3B325A0839600EBD95F /* XCRemoteSwiftPackageReference "BlueSocket" */,
+			);
 			productRefGroup = 0925962F256F219900C1C37C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -315,6 +331,7 @@
 				09259652256F219900C1C37C /* ContentView.swift in Sources */,
 				09060B402576393E00417065 /* BSP.swift in Sources */,
 				09259650256F219900C1C37C /* DigiFrameApp.swift in Sources */,
+				09EBF3A9259F252100EBD95F /* SSDP.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -325,6 +342,7 @@
 				09259653256F219900C1C37C /* ContentView.swift in Sources */,
 				09060B412576393E00417065 /* BSP.swift in Sources */,
 				09259651256F219900C1C37C /* DigiFrameApp.swift in Sources */,
+				09EBF3AA259F252100EBD95F /* SSDP.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -702,6 +720,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+		09EBF3B325A0839600EBD95F /* XCRemoteSwiftPackageReference "BlueSocket" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Kitura/BlueSocket.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.200;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
+			productName = SDWebImageSwiftUI;
+		};
+		09EBF3B425A0839600EBD95F /* Socket */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 09EBF3B325A0839600EBD95F /* XCRemoteSwiftPackageReference "BlueSocket" */;
+			productName = Socket;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 09259622256F219500C1C37C /* Project object */;
 }

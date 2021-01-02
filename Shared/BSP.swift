@@ -7,25 +7,6 @@
 
 import SwiftUI
 
-class ImageCache {
-    var cache = NSCache<NSString, UIImage>()
-    
-    func get(forKey key : String) -> UIImage? {
-        return cache.object(forKey: NSString(string: key))
-    }
-    
-    func set(forKey key : String, image : UIImage) {
-        cache.setObject(image, forKey: NSString(string: key))
-    }
-}
-
-extension ImageCache {
-    private static var imageCache = ImageCache()
-    static func getImageCache() -> ImageCache {
-        return imageCache
-    }
-}
-
 
 class Server : NSObject {
     
@@ -33,21 +14,22 @@ class Server : NSObject {
     var readingMessage = false
     var inputStream: InputStream!
     var outputStream : OutputStream!
-    var imageCache = ImageCache.getImageCache()
-    var address = "192.168.1.14"
+    var address : String?
     var port = 6969
     
     enum requestType:String {
         case transfer = "Transfer-Image"
         case request = "Request-Image"
+        case delete = "Delete-Image"
     }
     
     func connect() {
+        print("connecting to", address)
         var readStream : Unmanaged<CFReadStream>?
         var writeStream : Unmanaged<CFWriteStream>?
         
-        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, address as CFString, UInt32(port), &readStream, &writeStream)
-        
+        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, address! as CFString, UInt32(port), &readStream, &writeStream)
+
         inputStream = readStream!.takeRetainedValue()
         outputStream = writeStream?.takeRetainedValue()
         
@@ -58,36 +40,8 @@ class Server : NSObject {
         
         inputStream.open()
         outputStream.open()
+        print("streams openned")
         
-    }
-    
-    // Returns JSON data
-    private func generateHeaders(type : requestType, imageID: String? = nil, contentLength: Int? = nil) -> Data {
-        // Dictionary to convert to JSON
-        var jsonDictionary = [String:String]()
-        jsonDictionary.updateValue(type.rawValue, forKey: "Request-Type")
-        
-        if contentLength != nil{
-            jsonDictionary.updateValue(String(contentLength!), forKey: "Content-Length")
-        }
-        else {
-            jsonDictionary.updateValue("0", forKey: "Content-Length")
-            
-        }
-        if imageID != nil {
-            jsonDictionary.updateValue(imageID!, forKey: "Image-ID")
-        }
-        
-        var headers = Data()
-        
-        // Convert dictionary to JSON
-        do {
-            headers = try JSONSerialization.data(withJSONObject: jsonDictionary, options: [])
-        } catch {
-            print(error.localizedDescription)
-        }
-        
-        return headers
     }
     
     
@@ -101,127 +55,86 @@ class Server : NSObject {
             let content = strBase64.data(using: .utf8)!
             
             // Generate BSP headers to transfer image to server
-            let headers = self.generateHeaders(type: .transfer, contentLength: content.count)
-            
-            // First 3 bytes of message specify the size of the headers
-            // Encode data to be sent with utf8
-            let data = String(String(format: "%03d", headers.count)).data(using: .utf8)!
-            
-            // Send the header size to the server
-            data.withUnsafeBytes {
-                guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    print("Error")
-                    return
-                }
-                self.outputStream.write(pointer, maxLength: data.count)
-            }
-            
-            // Send the headers to the server
-            headers.withUnsafeBytes {
-                guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    print("Error")
-                    return
-                }
-                self.outputStream.write(pointer, maxLength: headers.count)
-            }
+            self.sendHeaders(type: .transfer, contentLength: content.count)
             
             // Send the image data to server
             self.writeall(data: content)
             
             print("Image sent to server")
             
-            //TO DO
-            // Change readmessage to return json headers then add that id to the list of all image ID's
-            self.readMessage { (imageID) in
-                // cache the imageID here
-                print(imageID)
-                DispatchQueue.main.async {
-                    self.imageCache.set(forKey: imageID, image: image)
-                    self.delegate?.finishedSendingImage(image: image)
-                    
-                }
-                print("!!!~~~~~~~~ Cached image~~!!!!!")
-                
-            }
+            self.readMessage()
         }
-        
-        
+    }
+    
+    func delete(image: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.sendHeaders(type: .delete, imageID: image)
+        }
     }
     
     func receiveAllImages(){
         readingMessage = true
         DispatchQueue.global(qos: .userInitiated).async {
-            
             // Generate BSP headers to transfer image to server
-            let headers = self.generateHeaders(type: .request)
+            self.sendHeaders(type: .request)
             
-            // First 3 bytes of message specify the size of the headers
-            // Encode data to be sent with utf8
-            let data = String(String(format: "%03d", headers.count)).data(using: .utf8)!
-            
-            // Send the header size to the server
-            data.withUnsafeBytes {
-                guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    print("Error")
-                    return
-                }
-                self.outputStream.write(pointer, maxLength: data.count)
-            }
-            
-            // Send the headers to the server
-            headers.withUnsafeBytes {
-                guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
-                    print("Error")
-                    return
-                }
-                self.outputStream.write(pointer, maxLength: headers.count)
-            }
-            
-            // Receive dictionary with all the image ID's
-            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
-            
-            var numberOfBytesRead = 0
-            
-            numberOfBytesRead = self.inputStream.read(buffer, maxLength: 3)
-            guard let headerSize = self.processedMessageString(buffer: buffer, length: numberOfBytesRead) else {
-                self.readingMessage = false
-                return
-            }
-            
-            print("header size", headerSize)
-            
-            let size = Int(headerSize) ?? 0
-            let headerBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-            numberOfBytesRead = self.inputStream.read(headerBuffer, maxLength: size)
-            print("read header of bytes", numberOfBytesRead)
-            
-            
-            // JSON Dictionary of all image ID's in format of [String:String] [index:imageID]
-            let jsonHeaders = self.readall(contentLength: size)
-            
-            print("headers", jsonHeaders)
-            
-            do {
-                let decoded = try JSONSerialization.jsonObject(with: jsonHeaders.data(using: .utf8)!, options: [])
-                // Work with headers here
-                if let headers = decoded as? [String:String] {
-                    // Dictionary format int : string
-                    // list of all imageID's
-                   
-                    for (index, imageID) in headers {
-                        // add ID to a list of all image ID's
-                    }
-                    
-                    /// NOTIFY DELEGATE RECEIVED ALL IMAGE ID's
-                    
-                }
-                
-            } catch {
-                
-            }
-            
+            // Read the response
+            self.readMessage()
         }
     }
+    
+    
+    
+    // Returns JSON data for sending in a message
+    private func sendHeaders(type : requestType, contentLength: Int? = nil, imageID : String? = nil) {
+        // Dictionary to convert to JSON
+        var jsonDictionary = [String:String]()
+        
+        jsonDictionary.updateValue(type.rawValue, forKey: "Request-Type")
+        
+        if contentLength != nil{
+            jsonDictionary.updateValue(String(contentLength!), forKey: "Content-Length")
+        }
+        else {
+            jsonDictionary.updateValue("0", forKey: "Content-Length")
+        }
+        
+        if imageID != nil {
+            jsonDictionary.updateValue(imageID!, forKey: "ImageID")
+        }
+        
+        var headers = Data()
+        
+        // Convert dictionary to JSON
+        do {
+            headers = try JSONSerialization.data(withJSONObject: jsonDictionary, options: [])
+        } catch {
+            print(error.localizedDescription)
+        }
+        
+        // First 3 bytes of message specify the size of the headers
+        // Encode data to be sent with utf8
+        let data = String(String(format: "%03d", headers.count)).data(using: .utf8)!
+        
+        // Send the header size to the server
+        data.withUnsafeBytes {
+            guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                print("Error")
+                return
+            }
+            self.outputStream.write(pointer, maxLength: data.count)
+        }
+        
+        // Send the headers to the server
+        headers.withUnsafeBytes {
+            guard let pointer = $0.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                print("Error")
+                return
+            }
+            self.outputStream.write(pointer, maxLength: headers.count)
+        }
+    }
+    
     
     private func readall(contentLength: Int) -> String {
         var bytesRemaining = contentLength
@@ -235,13 +148,8 @@ class Server : NSObject {
             
             if bytesRead > 0
             {
-                
-                guard let string = String(
-                        bytesNoCopy: buffer,
-                        length: bytesRead,
-                        encoding: .utf8,
-                        freeWhenDone: true)
-                else {
+                guard let string = processedMessageString(buffer: buffer, length: bytesRead) else {
+                    print("Error converting buffer to string")
                     return String()
                 }
                 
@@ -253,6 +161,7 @@ class Server : NSObject {
                 {
                     return data
                 }
+                
             }
             else
             {
@@ -292,8 +201,7 @@ class Server : NSObject {
                 }
                 
                 remainingData = remainingData.advanced(by: bytesWritten)
-                print("\r\((Double(bytesRemaining) / Double(data.count) * 100.0))% transfered")
-                
+                //print("\r\((Double(bytesRemaining) / Double(data.count) * 100.0))% transfered")
             }
             else
             {
@@ -310,9 +218,8 @@ class Server : NSObject {
 }
 
 protocol serverDelegate: class {
-    func receivedImage(image: UIImage)
-    func finishedSendingImage(image: UIImage)
-    func finishedReceivingImages()
+    func finishedSendingImage(image: String)
+    func finishedReceivingImages(_ images: [String])
     func received()
     func connected()
     func timedOut()
@@ -323,10 +230,7 @@ extension Server: StreamDelegate {
     func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
         switch eventCode {
         case .hasBytesAvailable:
-            if !readingMessage {
-                print("new message received")
-                //readMessage(stream: aStream as! InputStream)
-            }
+            print("new message received")
         case .endEncountered:
             print("end encountered")
         case .errorOccurred:
@@ -338,7 +242,7 @@ extension Server: StreamDelegate {
             print("Connected successfuly")
             delegate?.connected()
         case .errorOccurred:
-            print("Did not connected")
+            print("Did not connect")
         default:
             print("some other event...")
         }
@@ -364,10 +268,8 @@ extension Server: StreamDelegate {
         return string
     }
     
-    // TO DO
-    // Change this to read Headers and return a json dictionary
     
-    private func readMessage(stream: InputStream? = nil, receivedImageID: (_ imageID: String) -> () = {_ in }) {
+    private func readMessage(stream: InputStream? = nil) {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 3)
         
         readingMessage = true
@@ -396,16 +298,49 @@ extension Server: StreamDelegate {
         
         do {
             let decoded = try JSONSerialization.jsonObject(with: jsonHeaders.data(using: .utf8)!, options: [])
+            print(decoded)
             // Work with headers here
-            if let headers = decoded as? [String:String] {
-                
+            if let headers = decoded as? [String:Any] {
+                print("decoded headers", headers)
                 if let imageID = headers["ImageID"] {
-                    receivedImageID(imageID)
+                    // receivedImageID(imageID)
+                    DispatchQueue.main.async {
+                        self.delegate?.finishedSendingImage(image: imageID as! String)
+                    }
+                }
+                else if let contentLength = headers["Content-Length"] {
+                    
+                    let content = self.readall(contentLength: contentLength as! Int)
+                    let jsonContent = try JSONSerialization.jsonObject(with: content.data(using: .utf8)!, options: [])
+                    
+                    print("raw content", content)
+                    print("to json", jsonContent)
+                    if let iamgeIDDictionary = jsonContent as? [String:String] {
+                        print("dictionary", iamgeIDDictionary)
+                        
+                        var imageIDs = [String]()
+                        
+                        for (index, image) in iamgeIDDictionary {
+                            // add imageID to list
+                            if index == "0" && image == "0" {
+                                // no images
+                                break
+                            }
+                            
+                            imageIDs.append(image)
+                            
+                        }
+                        print("finished")
+                        
+                        DispatchQueue.main.async {
+                            self.delegate?.finishedReceivingImages(imageIDs)
+                        }
+                    }
                 }
             }
             
         } catch {
-            
+            print("failed decoding json headers")
         }
         
         delegate?.received()

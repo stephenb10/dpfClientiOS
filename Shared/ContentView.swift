@@ -6,26 +6,84 @@
 //
 
 import SwiftUI
+import SDWebImageSwiftUI
 
 struct im : Identifiable {
     var id = UUID()
-    @State var image : UIImage
+    var filename : String
 }
 
 class Model: ObservableObject, serverDelegate {
+    
     @Published var images = [im]()
     @Published var recevingImages = false
     @Published var sendingImage = false
     @Published var connecting = true
     @Published var didTimeOut = false
     
+    let ssdp = SSDP()
     let serv = Server()
     
     init() {
         serv.delegate = self
+        tryConnect()
+    }
+    
+    
+    
+    // TO DO
+    // Keep track of retry attempts to connect and then prompt to re run SSDP again
+    // Check if connection has been interupted
+    
+    func tryConnect(){
         connecting = true
+        
+        let defaults = UserDefaults.standard
+        
+        // If we know the IP address already
+        if let address = defaults.value(forKey: "ipAddress") {
+            print(address, "saved")
+            connect(to: address as! String)
+            return
+        }
+        // Search for IP address
+        
+        var address : String? = nil
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            address = self.ssdp.discover()
+            DispatchQueue.main.async {
+                if address != nil {
+                    print(address, "discovered")
+                    defaults.setValue(address, forKey: "ipAddress")
+                    self.connect(to: address!)
+                    return
+                }
+                else {
+                    print("failed to find")
+                    
+                    // Could not find IP address
+                    self.connecting = false
+                    self.didTimeOut = true
+                }
+                
+            }
+            
+            
+        }
+        
+        
+    }
+    
+    func connect(to address: String) {
+        print("starting up tcp connection")
         _ = Timer.scheduledTimer(timeInterval: 5.0, target: self, selector: #selector(timedOut), userInfo: nil, repeats: false)
-        serv.connect()
+        
+        serv.address = address
+        print("set the socket address to", address)
+        self.serv.connect()
+        
+        print("socket connection finished")
     }
     
     
@@ -37,15 +95,11 @@ class Model: ObservableObject, serverDelegate {
         }
     }
     
-    func receivedImage(image: UIImage) {
-        self.images.append(im(image: image))
-        
-        //self.objectWillChange.send()
-        print("received image from server")
-    }
-    
-    func finishedReceivingImages() {
+    func finishedReceivingImages(_ images: [String]) {
         recevingImages = false
+        for s in images {
+            self.images.append(im(filename: s))
+        }
         print("received all images")
     }
     
@@ -53,14 +107,16 @@ class Model: ObservableObject, serverDelegate {
         
     }
     
-    func finishedSendingImage(image: UIImage) {
+    func finishedSendingImage(image: String) {
         sendingImage = false
-        images.append(im(image: image))
+        images.append(im(filename: image))
     }
     
     func connected() {
+        print("connected successfuly")
         recevingImages = true
         connecting = false
+        didTimeOut = false
         serv.receiveAllImages()
     }
     
@@ -72,7 +128,7 @@ struct ContentView: View {
     @State var image: Image? = nil
     @State var uiimage: UIImage? = nil
     @State var showImageFullView = false
-    @State var selectedImage = UIImage()
+    @State var selectedImage = String()
     
     
     
@@ -116,62 +172,83 @@ struct ContentView: View {
             if !self.model.connecting {
                 
                 if self.model.didTimeOut {
-                    Text(":( Couldnt find Photo Frame")
+                    Text("Couldnt find Photo Frame :(")
+                    Button("Retry"){
+                        self.model.tryConnect()
+                    }
                 }
                 else {
+                    
+                    if model.images.count > 0 {
                     LazyVGrid(columns: columns, spacing: 0) {
-                        ForEach(model.images, id: \.id) { i in
-                            Button {
-                                self.selectedImage = i.image
-                                showImageFullView = true
-                            } label: {
-                                Image(uiImage: i.image).resizable().frame(width: 100, height: 100)
-                            }
-                            .fullScreenCover(isPresented: $showImageFullView) {
-                                fullScreenImage(showView: $showImageFullView, image: selectedImage)
-                            }
+                        ForEach(model.images) { i in
+                            let address = "http://\(self.model.serv.address)/\(i.filename)"
+                            AnimatedImage(url: URL(string: address))
+                                .resizable()
+                                .placeholder(UIImage(systemName: "photo"))
+                                .indicator(.activity)
+                                .transition(.fade(duration: 0.5))
+                                .frame(width: 100, height: 100)
+                                .onTapGesture {
+                                    self.selectedImage = i.filename
+                                    showImageFullView = true
+                                }
+                                .fullScreenCover(isPresented: $showImageFullView) {
+                                    fullScreenImage(showView: $showImageFullView, model: model, imageID: selectedImage)
+                                }
                             
                         }
                     }
+                    }
+                    else {
+                        Text("No images yet")
+                    }
+                    
+                    
                     
                 }
-            
+                
             }
-            
             
         }
     }
 }
 
-
-
-
 struct fullScreenImage: View {
     
     @Binding var showView : Bool
-    let image: UIImage
+    @ObservedObject var model : Model
+    let imageID: String
     
     var body : some View {
-        
-        
         VStack {
-            Spacer()
             GeometryReader { geo in
-                Image(uiImage: image)
+                let address = "http://\(self.model.serv.address)/\(imageID)"
+                WebImage(url: URL(string: address))
                     .resizable()
+                    .placeholder(Image(systemName: "photo"))
+                    .indicator(.activity)
+                    .transition(.fade(duration: 0.5))
                     .aspectRatio(contentMode: .fit)
                     .frame(width: geo.size.width)
                     .onTapGesture {
                         showView = false
                     }
             }
-            Spacer()
-        }
-        .onAppear(){
-            if image.size.width == 0{
+            Button("Delete") {
+                self.model.serv.delete(image: imageID)
+                
+                var ii = 0
+                for i in self.model.images {
+                    if i.filename == imageID
+                    {
+                        break
+                    }
+                    ii += 1
+                }
+                self.model.images.remove(at: ii)
                 showView = false
             }
-            print(image.size)
         }
     }
 }
