@@ -221,6 +221,7 @@ protocol serverDelegate: class {
     func received()
     func connected()
     func timedOut()
+    func connectionClosed()
 }
 
 
@@ -228,8 +229,15 @@ extension Server: StreamDelegate {
     func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
         switch eventCode {
         case .hasBytesAvailable:
-            print("new message received")
+            if !readingMessage {
+                print("new message received")
+                if self.inputStream.read(UnsafeMutablePointer<UInt8>.allocate(capacity: 1), maxLength: 1) == 0 {
+                    delegate?.connectionClosed()
+                    
+                }
+            }
         case .endEncountered:
+            delegate?.connectionClosed()
             print("end encountered")
         case .errorOccurred:
             print("error occurred")
@@ -306,9 +314,28 @@ extension Server: StreamDelegate {
                         self.delegate?.finishedSendingImage(image: imageID as! String)
                     }
                 }
-                else if let contentLength = headers["Content-Length"] {
+                else if let cl = headers["Content-Length"]{
+                    var contentLength = 0
+                    if let i = cl as? Int {
+                        contentLength = i
+                    }
+                    else {
+                        contentLength = Int(cl as! String)!
+                    }
+
+                    var imageIDs = [String]()
+
                     
-                    let content = self.readall(contentLength: contentLength as! Int)
+                    if contentLength == 0 {
+                        print("No images")
+                        DispatchQueue.main.async {
+                            self.delegate?.finishedReceivingImages(imageIDs)
+                            return
+                        }
+                        return
+                    }
+                    
+                    let content = self.readall(contentLength: contentLength)
                     let jsonContent = try JSONSerialization.jsonObject(with: content.data(using: .utf8)!, options: [])
                     
                     print("raw content", content)
@@ -316,17 +343,10 @@ extension Server: StreamDelegate {
                     if let iamgeIDDictionary = jsonContent as? [String:String] {
                         print("dictionary", iamgeIDDictionary)
                         
-                        var imageIDs = [String]()
                         
                         for (index, image) in iamgeIDDictionary {
                             // add imageID to list
-                            if index == "0" && image == "0" {
-                                // no images
-                                break
-                            }
-                            
                             imageIDs.append(image)
-                            
                         }
                         print("finished")
                         

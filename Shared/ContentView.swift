@@ -95,6 +95,13 @@ class Model: ObservableObject, serverDelegate {
         }
     }
     
+    func connectionClosed() {
+        serv.close()
+        connectionError = true
+        didTimeOut = true
+        
+    }
+    
     func finishedReceivingImages(_ images: [String]) {
         recevingImages = false
         for s in images {
