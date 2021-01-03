@@ -112,7 +112,7 @@ class SSDP {
                         ipAddr = response
                     }
                 } catch {
-                    print("SSDP Error!")
+                    print("SSDP Error:", error)
                 }
                 
             }

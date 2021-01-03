@@ -14,7 +14,7 @@ class Server : NSObject {
     var readingMessage = false
     var inputStream: InputStream!
     var outputStream : OutputStream!
-    var address : String?
+    var address = "localhost"
     var port = 6969
     
     enum requestType:String {
@@ -28,7 +28,7 @@ class Server : NSObject {
         var readStream : Unmanaged<CFReadStream>?
         var writeStream : Unmanaged<CFWriteStream>?
         
-        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, address! as CFString, UInt32(port), &readStream, &writeStream)
+        CFStreamCreatePairWithSocketToHost(kCFAllocatorDefault, address as CFString, UInt32(port), &readStream, &writeStream)
 
         inputStream = readStream!.takeRetainedValue()
         outputStream = writeStream?.takeRetainedValue()
@@ -39,9 +39,7 @@ class Server : NSObject {
         outputStream.schedule(in: .current, forMode: .common)
         
         inputStream.open()
-        outputStream.open()
-        print("streams openned")
-        
+        outputStream.open()        
     }
     
     

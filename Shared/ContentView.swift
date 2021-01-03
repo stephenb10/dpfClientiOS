@@ -4,22 +4,22 @@
 //
 //  Created by Stephen Byatt on 26/11/20.
 //
-
 import SwiftUI
 import SDWebImageSwiftUI
 
-struct im : Identifiable {
+struct bspImage : Identifiable {
     var id = UUID()
     var filename : String
 }
 
 class Model: ObservableObject, serverDelegate {
     
-    @Published var images = [im]()
+    @Published var images = [bspImage]()
     @Published var recevingImages = false
     @Published var sendingImage = false
     @Published var connecting = true
     @Published var didTimeOut = false
+    @Published var connectionError = false
     
     let ssdp = SSDP()
     let serv = Server()
@@ -28,9 +28,6 @@ class Model: ObservableObject, serverDelegate {
         serv.delegate = self
         tryConnect()
     }
-    
-    
-    
     // TO DO
     // Keep track of retry attempts to connect and then prompt to re run SSDP again
     // Check if connection has been interupted
@@ -46,44 +43,47 @@ class Model: ObservableObject, serverDelegate {
             connect(to: address as! String)
             return
         }
-        // Search for IP address
         
         var address : String? = nil
-        
         DispatchQueue.global(qos: .userInitiated).async {
             address = self.ssdp.discover()
             DispatchQueue.main.async {
                 if address != nil {
-                    print(address, "discovered")
+                    print(address!, "discovered")
                     defaults.setValue(address, forKey: "ipAddress")
                     self.connect(to: address!)
                     return
                 }
                 else {
                     print("failed to find")
-                    
                     // Could not find IP address
                     self.connecting = false
                     self.didTimeOut = true
                 }
-                
             }
-            
-            
         }
+    }
+    
+    func delete(image imageID : String){
+        self.serv.delete(image: imageID)
         
-        
+        var ii = 0
+        for i in images {
+            if i.filename == imageID
+            {
+                break
+            }
+            ii += 1
+        }
+        self.images.remove(at: ii)
     }
     
     func connect(to address: String) {
-        print("starting up tcp connection")
+        // Set timeout of 5 seconds
         _ = Timer.scheduledTimer(timeInterval: 5.0, target: self, selector: #selector(timedOut), userInfo: nil, repeats: false)
         
         serv.address = address
-        print("set the socket address to", address)
         self.serv.connect()
-        
-        print("socket connection finished")
     }
     
     
@@ -98,7 +98,7 @@ class Model: ObservableObject, serverDelegate {
     func finishedReceivingImages(_ images: [String]) {
         recevingImages = false
         for s in images {
-            self.images.append(im(filename: s))
+            self.images.append(bspImage(filename: s))
         }
         print("received all images")
     }
@@ -109,11 +109,10 @@ class Model: ObservableObject, serverDelegate {
     
     func finishedSendingImage(image: String) {
         sendingImage = false
-        images.append(im(filename: image))
+        images.append(bspImage(filename: image))
     }
     
     func connected() {
-        print("connected successfuly")
         recevingImages = true
         connecting = false
         didTimeOut = false
@@ -130,8 +129,6 @@ struct ContentView: View {
     @State var showImageFullView = false
     @State var selectedImage = String()
     
-    
-    
     let columns = [
         GridItem(.flexible()),
         GridItem(.flexible()),
@@ -141,7 +138,6 @@ struct ContentView: View {
     
     var body: some View {
         ScrollView {
-            
             Button(action: {
                 self.showImagePicker.toggle()
                 print("showing image picker", self.showImagePicker)
@@ -154,7 +150,6 @@ struct ContentView: View {
                     
                 }
             }
-            
             image?.resizable().frame(width: 100, height: 100)
             
             Button("Send to server") {
@@ -162,6 +157,10 @@ struct ContentView: View {
                     self.model.sendingImage = true
                     model.serv.send(image: uiimage!)
                 }
+            }
+            Button("Forget Photo Frame"){
+                let defaults = UserDefaults.standard
+                defaults.removeObject(forKey: "ipAddress")
             }
             Divider()
             
@@ -180,36 +179,42 @@ struct ContentView: View {
                 else {
                     
                     if model.images.count > 0 {
-                    LazyVGrid(columns: columns, spacing: 0) {
-                        ForEach(model.images) { i in
-                            let address = "http://\(self.model.serv.address)/\(i.filename)"
-                            AnimatedImage(url: URL(string: address))
-                                .resizable()
-                                .placeholder(UIImage(systemName: "photo"))
-                                .indicator(.activity)
-                                .transition(.fade(duration: 0.5))
-                                .frame(width: 100, height: 100)
-                                .onTapGesture {
-                                    self.selectedImage = i.filename
-                                    showImageFullView = true
-                                }
-                                .fullScreenCover(isPresented: $showImageFullView) {
-                                    fullScreenImage(showView: $showImageFullView, model: model, imageID: selectedImage)
-                                }
-                            
+                        LazyVGrid(columns: columns, spacing: 0) {
+                            ForEach(model.images) { i in
+                                let address = "http://\(self.model.serv.address)/\(i.filename)"
+                                AnimatedImage(url: URL(string: address))
+                                    .onFailure(perform: { (error) in
+                                        print("Error fetching image from server:", error)
+                                    })
+                                    .resizable()
+                                    .placeholder(UIImage(systemName: "photo"))
+                                    .indicator(.activity)
+    
+                                    .transition(.fade(duration: 0.5))
+                                    .frame(width: 100, height: 100)
+                                    .onTapGesture {
+                                        self.selectedImage = i.filename
+                                        showImageFullView = true
+                                    }
+                                    .contextMenu(ContextMenu(menuItems: {
+                                        Button(action: {
+                                            self.model.delete(image: i.filename)
+                                        }, label: {
+                                            Text("Delete")
+                                            Image(systemName: "trash")
+                                        })
+                                    }))
+                                    .fullScreenCover(isPresented: $showImageFullView) {
+                                        fullScreenImage(showView: $showImageFullView, model: model, imageID: selectedImage)
+                                    }
+                            }
                         }
-                    }
                     }
                     else {
                         Text("No images yet")
                     }
-                    
-                    
-                    
                 }
-                
             }
-            
         }
     }
 }
@@ -225,6 +230,9 @@ struct fullScreenImage: View {
             GeometryReader { geo in
                 let address = "http://\(self.model.serv.address)/\(imageID)"
                 WebImage(url: URL(string: address))
+                    .onFailure(perform: { (error) in
+                        print("Error fetching image from server:", error)
+                    })
                     .resizable()
                     .placeholder(Image(systemName: "photo"))
                     .indicator(.activity)
@@ -236,17 +244,12 @@ struct fullScreenImage: View {
                     }
             }
             Button("Delete") {
-                self.model.serv.delete(image: imageID)
-                
-                var ii = 0
-                for i in self.model.images {
-                    if i.filename == imageID
-                    {
-                        break
-                    }
-                    ii += 1
-                }
-                self.model.images.remove(at: ii)
+                self.model.delete(image: imageID)
+                showView = false
+            }
+        }
+        .onAppear(){
+            if imageID.isEmpty {
                 showView = false
             }
         }
