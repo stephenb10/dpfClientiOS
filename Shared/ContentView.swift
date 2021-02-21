@@ -7,66 +7,68 @@
 import SwiftUI
 import SDWebImageSwiftUI
 
-struct bspImage : Identifiable {
+struct dpfPhoto : Identifiable {
     var id = UUID()
     var filename : String
 }
 
-class Model: ObservableObject, serverDelegate {
+class Model: ObservableObject, dfpDelegate {
     
-    @Published var images = [bspImage]()
-    @Published var recevingImages = false
+    @Published var images = [dpfPhoto]()
     @Published var sendingImage = false
-    @Published var connecting = true
-    @Published var didTimeOut = false
-    @Published var connectionError = false
+    @Published var connectionFailed = false
+    @Published var sendingProgress : Double = 0
+    @Published var selectedImage = String()
     
     let ssdp = SSDP()
-    let serv = Server()
+    let dfp = dfpAPI()
     
     init() {
-        serv.delegate = self
+        dfp.delegate = self
         tryConnect()
     }
-    // TO DO
-    // Keep track of retry attempts to connect and then prompt to re run SSDP again
-    // Check if connection has been interupted
     
     func tryConnect(){
-        connecting = true
-        
         let defaults = UserDefaults.standard
         
         // If we know the IP address already
         if let address = defaults.value(forKey: "ipAddress") {
             print(address, "saved")
-            connect(to: address as! String)
-            return
+            dfp.setIP(address: address as! String)
         }
-        
-        var address : String? = nil
-        DispatchQueue.global(qos: .userInitiated).async {
-            address = self.ssdp.discover()
-            DispatchQueue.main.async {
-                if address != nil {
-                    print(address!, "discovered")
-                    defaults.setValue(address, forKey: "ipAddress")
-                    self.connect(to: address!)
-                    return
-                }
-                else {
-                    print("failed to find")
-                    // Could not find IP address
-                    self.connecting = false
-                    self.didTimeOut = true
+        else {
+            // Discover Photo Frame
+            var address : String? = nil
+            DispatchQueue.global(qos: .userInitiated).async {
+                address = self.ssdp.discover()
+                DispatchQueue.main.async { [self] in
+                    if address != nil {
+                        print(address!, "discovered")
+                        defaults.setValue(address, forKey: "ipAddress")
+                        dfp.setIP(address: address!)
+                    }
+                    else {
+                        print("failed to find")
+                        // Could not find IP address
+                        self.connectionFailed = true
+                    }
                 }
             }
         }
+        
+        
+        dfp.getPhotoIDs()
+        if images.count > 0
+        {
+            selectedImage = images.first!.filename
+        }
+        
     }
     
     func delete(image imageID : String){
-        self.serv.delete(image: imageID)
+        self.dfp.deleteImage(withName: imageID)
         
+        // zip range and images into one loop with index as well
         var ii = 0
         for i in images {
             if i.filename == imageID
@@ -78,63 +80,37 @@ class Model: ObservableObject, serverDelegate {
         self.images.remove(at: ii)
     }
     
-    func connect(to address: String) {
-        // Set timeout of 5 seconds
-        _ = Timer.scheduledTimer(timeInterval: 5.0, target: self, selector: #selector(timedOut), userInfo: nil, repeats: false)
-        
-        serv.address = address
-        self.serv.connect()
+    func didSendImage(imageID: String) {
+        sendingImage = false
+        sendingProgress = 0
+        images.append(dpfPhoto(filename: imageID))
     }
     
-    
-    @objc func timedOut() {
-        if connecting {
-            serv.close()
-            connecting = false
-            didTimeOut = true
-        }
-    }
-    
-    func connectionClosed() {
-        serv.close()
-        connectionError = true
-        didTimeOut = true
-        
-    }
-    
-    func finishedReceivingImages(_ images: [String]) {
-        recevingImages = false
+    func didReceiveImageIDs(_ images: [String]) {
         for s in images {
-            self.images.append(bspImage(filename: s))
+            self.images.append(dpfPhoto(filename: s))
         }
+        
         print("received all images")
     }
     
-    func received() {
-        
+    func didCloseConnection() {
+        connectionFailed = true
     }
     
-    func finishedSendingImage(image: String) {
-        sendingImage = false
-        images.append(bspImage(filename: image))
+    func progressSent(value: Double) {
+        self.sendingProgress = value
     }
-    
-    func connected() {
-        recevingImages = true
-        connecting = false
-        didTimeOut = false
-        serv.receiveAllImages()
-    }
-    
 }
 
 struct ContentView: View {
-    @ObservedObject var model = Model()
+    @EnvironmentObject var model : Model
     @State var showImagePicker: Bool = false
     @State var image: Image? = nil
     @State var uiimage: UIImage? = nil
     @State var showImageFullView = false
-    @State var selectedImage = String()
+    @State var showActionSheet = false
+    
     
     let columns = [
         GridItem(.flexible()),
@@ -144,64 +120,43 @@ struct ContentView: View {
     ]
     
     var body: some View {
-        ScrollView {
-            Button(action: {
-                self.showImagePicker.toggle()
-                print("showing image picker", self.showImagePicker)
-            }) {
-                Text("Show image picker")
-            }.sheet(isPresented: $showImagePicker) {
-                ImagePicker(sourceType: .photoLibrary) { image in
-                    self.uiimage = image
-                    self.image = Image(uiImage: image)
-                    
-                }
-            }
-            image?.resizable().frame(width: 100, height: 100)
-            
-            Button("Send to server") {
-                if(image != nil) {
-                    self.model.sendingImage = true
-                    model.serv.send(image: uiimage!)
-                }
-            }
-            Button("Forget Photo Frame"){
-                let defaults = UserDefaults.standard
-                defaults.removeObject(forKey: "ipAddress")
-            }
-            Divider()
-            
-            if(self.model.recevingImages ||  self.model.sendingImage || self.model.connecting){
-                ProgressView()
-            }
-            
-            if !self.model.connecting {
+        NavigationView {
+            ScrollView {
                 
-                if self.model.didTimeOut {
+                if(self.model.sendingImage){
+                    image?.resizable().frame(width: 100, height: 100)
+                        .padding()
+                    ProgressView()
+                        .padding()
+                    ProgressBar()
+                        .padding()
+                    Divider()
+                        .padding()
+                }
+                
+                if self.model.connectionFailed {
                     Text("Couldnt find Photo Frame :(")
                     Button("Retry"){
                         self.model.tryConnect()
                     }
-                }
-                else {
-                    
+                } else {
                     if model.images.count > 0 {
                         LazyVGrid(columns: columns, spacing: 0) {
                             ForEach(model.images) { i in
-                                let address = "http://\(self.model.serv.address)/\(i.filename)"
-                                AnimatedImage(url: URL(string: address))
+                                let address = "\(self.model.dfp.serverAddress)photos/\(i.filename)"
+                                AnimatedImage(url: URL(string: address), options: .allowInvalidSSLCertificates)
                                     .onFailure(perform: { (error) in
                                         print("Error fetching image from server:", error)
                                     })
                                     .resizable()
-                                    .placeholder(UIImage(systemName: "photo"))
                                     .indicator(.activity)
-    
-                                    .transition(.fade(duration: 0.5))
                                     .frame(width: 100, height: 100)
+                                    .clipped()
                                     .onTapGesture {
-                                        self.selectedImage = i.filename
-                                        showImageFullView = true
+                                        self.model.selectedImage = i.filename
+                                        self.showImageFullView = true
+                                        print("tapped on ", i, showImageFullView)
+                                        
                                     }
                                     .contextMenu(ContextMenu(menuItems: {
                                         Button(action: {
@@ -211,9 +166,7 @@ struct ContentView: View {
                                             Image(systemName: "trash")
                                         })
                                     }))
-                                    .fullScreenCover(isPresented: $showImageFullView) {
-                                        fullScreenImage(showView: $showImageFullView, model: model, imageID: selectedImage)
-                                    }
+                                    
                             }
                         }
                     }
@@ -221,29 +174,90 @@ struct ContentView: View {
                         Text("No images yet")
                     }
                 }
+                
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .fullScreenCover(isPresented: $showImageFullView) {
+                fullScreenImage(showView: $showImageFullView)
+            }
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(sourceType: .photoLibrary) { image in
+                    self.uiimage = image
+                    self.image = Image(uiImage: image)
+                    
+                    if(image != nil) {
+                        self.model.sendingImage = true
+                        model.dfp.send(image: uiimage!)
+                    }
+                }
+            }
+            .actionSheet(isPresented: $showActionSheet, content: {
+                ActionSheet(title: Text("Settings"), buttons: [.destructive(Text("Forget Photo Frame"), action: {
+                    let defaults = UserDefaults.standard
+                    defaults.removeObject(forKey: "ipAddress")
+                    print("dpf forgotten")
+                }),
+                .default(Text("Refresh"), action: {
+                    self.model.images.removeAll()
+                    self.model.dfp.getPhotoIDs()
+                }),
+                .cancel()])
+            })
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        self.showImagePicker.toggle()
+                        print("showing image picker", self.showImagePicker)
+                    }, label: {
+                        Label("Add", systemImage: "plus")
+                    })
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        showActionSheet = true
+                    }, label: {
+                        Label("Add", systemImage: "gearshape")
+                    })
+                }
             }
         }
     }
 }
 
-struct fullScreenImage: View {
+struct ProgressBar: View {
+    @EnvironmentObject var model : Model
     
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Rectangle().frame(width: geometry.size.width , height: geometry.size.height)
+                    .opacity(0.3)
+                    .foregroundColor(Color(UIColor.systemTeal))
+                
+                Rectangle().frame(width: min(CGFloat(self.model.sendingProgress)*geometry.size.width, geometry.size.width), height: geometry.size.height)
+                    .foregroundColor(Color(UIColor.systemBlue))
+                    .animation(.linear)
+            }.cornerRadius(45.0)
+        }
+    }
+}
+
+struct fullScreenImage: View {
     @Binding var showView : Bool
-    @ObservedObject var model : Model
-    let imageID: String
+    @EnvironmentObject var model : Model
     
     var body : some View {
         VStack {
             GeometryReader { geo in
-                let address = "http://\(self.model.serv.address)/\(imageID)"
-                WebImage(url: URL(string: address))
+                let address = "\(self.model.dfp.serverAddress)photos/\(self.model.selectedImage)"
+                WebImage(url: URL(string: address), options: .allowInvalidSSLCertificates)
                     .onFailure(perform: { (error) in
                         print("Error fetching image from server:", error)
                     })
                     .resizable()
                     .placeholder(Image(systemName: "photo"))
                     .indicator(.activity)
-                    .transition(.fade(duration: 0.5))
                     .aspectRatio(contentMode: .fit)
                     .frame(width: geo.size.width)
                     .onTapGesture {
@@ -251,12 +265,12 @@ struct fullScreenImage: View {
                     }
             }
             Button("Delete") {
-                self.model.delete(image: imageID)
+                self.model.delete(image: self.model.selectedImage)
                 showView = false
             }
         }
         .onAppear(){
-            if imageID.isEmpty {
+            if self.model.selectedImage.isEmpty {
                 showView = false
             }
         }

@@ -28,6 +28,7 @@ class SSDP {
                 return "255.255.255.255"
             }
             var broadcastAddressArray = [String]()
+            // Create broadcast address from ip address and subnet mask
             for i in 0..<4 {
                 let ipAddressByte = UInt8(ipAdressArray[i]) ?? 0
                 let subnetMaskbyte = UInt8(subnetMaskArray[i]) ?? 0
@@ -68,7 +69,6 @@ class SSDP {
                                 nil, socklen_t(0), NI_NUMERICHOST)
                     address = String(cString: hostname)
                     
-                    
                     var net = interface.ifa_netmask.pointee
                     var mask = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                     getnameinfo(&net, socklen_t(net.sa_len), &mask, socklen_t(mask.count), nil, socklen_t(0), NI_NUMERICHOST)
@@ -102,13 +102,13 @@ class SSDP {
                     let socket = try Socket.create(family: .inet, type: .datagram, proto: .udp)
                     try socket.udpBroadcast(enable: true)
                     try socket.setReadTimeout(value: 5000) // Set timeout to 5 seconds
-                    try socket.write(from: "BSP: Requesting IP address of Digital Photo Frame", to: fullAddr!)
+                    try socket.write(from: "DPF: Requesting IP address of Digital Photo Frame", to: fullAddr!)
                     
                     var data = Data()
                     let tuple = try socket.readDatagram(into: &data)
                     if tuple.bytesRead > 0 {
                         let response = String(data: data, encoding: .utf8)
-                        print(response!)
+                        //print(response!)
                         ipAddr = response
                     }
                 } catch {

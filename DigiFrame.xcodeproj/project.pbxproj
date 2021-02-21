@@ -17,6 +17,9 @@
 		09259653256F219900C1C37C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09259628256F219500C1C37C /* ContentView.swift */; };
 		09259654256F219900C1C37C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09259629256F219900C1C37C /* Assets.xcassets */; };
 		09259655256F219900C1C37C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09259629256F219900C1C37C /* Assets.xcassets */; };
+		0944BAA625D1409B00A13C64 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 0944BAA525D1409B00A13C64 /* Alamofire */; };
+		0944BAAC25D1416300A13C64 /* dpfAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0944BAAB25D1416300A13C64 /* dpfAPI.swift */; };
+		0944BAAD25D1416300A13C64 /* dpfAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0944BAAB25D1416300A13C64 /* dpfAPI.swift */; };
 		09D07CCE259C1AB500FC11EB /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */; };
 		09EBF3A9259F252100EBD95F /* SSDP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09EBF3A8259F252100EBD95F /* SSDP.swift */; };
 		09EBF3AA259F252100EBD95F /* SSDP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09EBF3A8259F252100EBD95F /* SSDP.swift */; };
@@ -56,6 +59,7 @@
 		09259649256F219900C1C37C /* Tests macOS.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Tests macOS.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		0925964D256F219900C1C37C /* Tests_macOS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests_macOS.swift; sourceTree = "<group>"; };
 		0925964F256F219900C1C37C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0944BAAB25D1416300A13C64 /* dpfAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dpfAPI.swift; sourceTree = "<group>"; };
 		09EBF3A8259F252100EBD95F /* SSDP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSDP.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -64,6 +68,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0944BAA625D1409B00A13C64 /* Alamofire in Frameworks */,
 				09EBF3B525A0839600EBD95F /* Socket in Frameworks */,
 				09D07CCE259C1AB500FC11EB /* SDWebImageSwiftUI in Frameworks */,
 			);
@@ -113,6 +118,7 @@
 				09259629256F219900C1C37C /* Assets.xcassets */,
 				09060B3F2576393D00417065 /* BSP.swift */,
 				09EBF3A8259F252100EBD95F /* SSDP.swift */,
+				0944BAAB25D1416300A13C64 /* dpfAPI.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -182,6 +188,7 @@
 			packageProductDependencies = (
 				09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */,
 				09EBF3B425A0839600EBD95F /* Socket */,
+				0944BAA525D1409B00A13C64 /* Alamofire */,
 			);
 			productName = "DigiFrame (iOS)";
 			productReference = 0925962E256F219900C1C37C /* DigiFrame.app */;
@@ -277,6 +284,7 @@
 			packageReferences = (
 				09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 				09EBF3B325A0839600EBD95F /* XCRemoteSwiftPackageReference "BlueSocket" */,
+				0944BAA425D1409B00A13C64 /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
 			productRefGroup = 0925962F256F219900C1C37C /* Products */;
 			projectDirPath = "";
@@ -330,6 +338,7 @@
 			files = (
 				09259652256F219900C1C37C /* ContentView.swift in Sources */,
 				09060B402576393E00417065 /* BSP.swift in Sources */,
+				0944BAAC25D1416300A13C64 /* dpfAPI.swift in Sources */,
 				09259650256F219900C1C37C /* DigiFrameApp.swift in Sources */,
 				09EBF3A9259F252100EBD95F /* SSDP.swift in Sources */,
 			);
@@ -341,6 +350,7 @@
 			files = (
 				09259653256F219900C1C37C /* ContentView.swift in Sources */,
 				09060B412576393E00417065 /* BSP.swift in Sources */,
+				0944BAAD25D1416300A13C64 /* dpfAPI.swift in Sources */,
 				09259651256F219900C1C37C /* DigiFrameApp.swift in Sources */,
 				09EBF3AA259F252100EBD95F /* SSDP.swift in Sources */,
 			);
@@ -498,7 +508,7 @@
 				DEVELOPMENT_TEAM = U3ZPB6U89W;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -520,7 +530,7 @@
 				DEVELOPMENT_TEAM = U3ZPB6U89W;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = iOS/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -724,6 +734,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0944BAA425D1409B00A13C64 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.4.1;
+			};
+		};
 		09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
@@ -743,6 +761,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0944BAA525D1409B00A13C64 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0944BAA425D1409B00A13C64 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
 		09D07CCD259C1AB500FC11EB /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 09D07CCC259C1AB500FC11EB /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
